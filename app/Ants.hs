@@ -6,7 +6,6 @@
 
 module Main (main) where
 
-import Graphics.UI.WX hiding (when)
 import GamePlay
 import Options
 import Simulator
@@ -18,13 +17,16 @@ import qualified Data.Set as S
 import Data.Maybe
 import System.Time
 import Caching
+import Graphics.Gloss (Display(InWindow), Picture, play, color, text)
+import Graphics.Gloss.Data.Color (Color, black, red)
+import Graphics.Gloss.Interface.IO.Game (Event)
 
 main :: IO ()
 main =
    do myOptions <- processArguments
       if Simulate `elem` myOptions
          then simulate myOptions
-         else start (gui myOptions)
+         else gui myOptions
 
 ---------------------------------------------------------------------------------
 -- Simulate only
@@ -48,6 +50,32 @@ showScore myOptions game =
 
 ---------------------------------------------------------------------------------
 -- Visualize game
+
+-- FIXME: keep real state
+type GuiState = ()
+
+gui :: Options -> IO ()
+gui myOptions = do
+      -- create window
+      let display = InWindow "AFP 2016: Ant Visualizer" (1000, 700) (100, 100)
+      let background = black
+      let fps = 60
+      let initialState = ()
+      play display background fps initialState (draw (1000, 700)) eventHandler timeHandler
+
+-- FIXME: draw the real thing
+draw :: (Float, Float) -> GuiState -> Picture
+draw (w, h) () = color red $ text "Hello world"
+
+-- FIXME: process events
+eventHandler :: Event -> GuiState -> GuiState
+eventHandler e state = state
+
+-- FIXME: process time
+timeHandler :: Float -> GuiState -> GuiState
+timeHandler dt state = state
+
+{-
 
 type ControlWidgets = (Timer, Button (), Button (), Button (), Button ())
 type InfoWidgets    = (StaticText (), StaticText (), StaticText (), StaticText (), StaticText (), StaticText (), StaticText ())
@@ -237,6 +265,8 @@ scalingHandler scalingSlider gameBoard ref =
       setVirtualSize gameBoard ref
       repaint gameBoard
 
+-}
+
 -----------------------------------------------------------
 -- GUI data
 
@@ -275,6 +305,8 @@ readFromIORef ref f =
 useCache :: (Cache -> IO a) -> GUI a
 useCache f ref =
    readFromIORef ref cache >>= f
+
+{-
 
 -----------------------------------------------------------
 -- Do some steps in the simulator
@@ -335,6 +367,7 @@ drawOneAnt dc scale pos ant ref =
       when (antHasFood ant) $
          do middle <- useCache (cellCentre pos) ref
             circle dc middle (round (scale/5)) [color := foodGreen, brushColor := foodGreen, brushKind := BrushSolid]
+-}
 
 -----------------------------------------------------------
 -- Estimating Time Remaining
@@ -344,6 +377,7 @@ type Timing = Maybe (Int {-tick-}, Int {-roundnumber-}, ClockTime)
 timingFrequency :: Int
 timingFrequency = 5
 
+{-
 resetTiming :: GUI ()
 resetTiming ref =
    do rnr   <- readFromIORef ref (roundNumber . gameState)
@@ -430,6 +464,8 @@ myBox w s =
 (.^.) :: StaticText () -> Layout -> Layout
 st .^. l = column 5 [hfill $ widget st, l]
 
+-}
+
 makeStepList :: Int -> Int -> [Int]
 makeStepList steps ticks =
    let stp :: Double
@@ -438,6 +474,10 @@ makeStepList steps ticks =
        difList _          = []
    in cycle $ difList (0 : map (round . (stp*) . fromIntegral) [1..ticks])
 
+{-
+
 foodGreen, niceBlue :: Color
 foodGreen = rgb 72 239 54
 niceBlue  = rgb 0 0 127
+
+-}
