@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module GamePlay where
 
 import Simulator
@@ -5,7 +7,9 @@ import ReadWorld
 import ReadInstructions
 import Options
 import Data.Array.IO
-import Control.Monad.State
+import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.State.Lazy
 import qualified Data.Set as S
 
 makeGameState :: Options -> IO GameState
@@ -13,9 +17,9 @@ makeGameState options =
    do theWorld   <- readWorld (getWorldFile options)
       redInstr   <- readInstructions (getRedFile options)
       blackInstr <- readInstructions (getBlackFile options)
-      
+
       (pm, foodPos, foodParticles) <- populateWorld theWorld
-      
+
       return $ GameState
          { world             = theWorld
          , redInstructions   = redInstr
@@ -27,7 +31,7 @@ makeGameState options =
          }
 
 populateWorld :: World -> IO (AntPositions, S.Set Pos, Int)
-populateWorld theWorld = 
+populateWorld theWorld =
    do list <- getAssocs theWorld
       (nrOfAnts, pm, foodSet, nrOfFood) <- foldM op (0, [], S.empty, 0) list
       arr <- newListArray (0, nrOfAnts - 1) (reverse pm)
@@ -35,14 +39,14 @@ populateWorld theWorld =
  where
    op this@(i, pm, fm, f) (pos, cell)
       | food cell > 0 = return (i, pm, S.insert pos fm, f + food cell)
-      | otherwise = 
+      | otherwise =
            case anthill cell of
-              Nothing -> 
+              Nothing ->
                  return this
               Just c ->
                  do writeArray theWorld pos (cell { antInCell = Just (makeAnt i c) })
                     return (i+1, Just pos : pm, fm, f)
-         
+
 makeAnt :: Int -> AntColor -> Ant
 makeAnt i c = Ant
    { antId        = i
@@ -54,12 +58,12 @@ makeAnt i c = Ant
    }
 
 allRounds :: Options -> Sim ()
-allRounds options = 
+allRounds options =
    do when (DumpFile `elem` options) (liftIO (putStrLn "") >> dumpRound)
       replicateM_ (getNrOfRounds options) (oneRound options)
 
 oneRound :: Options -> Sim ()
-oneRound options = 
+oneRound options =
    do rnr <- gets roundNumber
       unless (rnr >= getNrOfRounds options) $
          do modify (\game -> game {roundNumber = roundNumber game + 1})
@@ -67,9 +71,9 @@ oneRound options =
             list <- liftIO $ getAssocs pm
             mapM_ step list
             when (DumpFile `elem` options) dumpRound
-            
+
 dumpRound :: Sim ()
-dumpRound = 
+dumpRound =
    do w     <- gets world
       list  <- liftIO $ getAssocs w
       i     <- gets roundNumber
