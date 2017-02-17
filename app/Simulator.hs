@@ -1,4 +1,4 @@
-{- 
+{-
    Dinner with Ambiants: ICFP Programming Contest 2004
    Programming Assignment for Advanced Functional Programming
    Universiteit Utrecht, Software Technology Master
@@ -6,7 +6,9 @@
 
 module Simulator where
 
-import Control.Monad.State
+import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.State.Lazy
 import Data.Char
 import Data.Maybe
 import Data.Array.IO
@@ -17,16 +19,16 @@ import qualified Data.Set as S
 
 ------------------------------------------------------------------
 
-data GameState = GameState 
+data GameState = GameState
    { world             :: World
-   , redInstructions   :: AntInstructions 
+   , redInstructions   :: AntInstructions
    , blackInstructions :: AntInstructions
    , antPositions      :: AntPositions
    , randoms           :: [Int]
    , roundNumber       :: Int
    , foodAdmin         :: FoodAdmin
    }
- 
+
 type Sim = StateT GameState IO
 
 runSimulator :: Sim () -> GameState -> IO GameState
@@ -37,7 +39,7 @@ runSimulator = execStateT
 
 data Pos = Pos { posX :: !Int, posY :: !Int }
 
-instance Show Pos where 
+instance Show Pos where
    show p = "(" ++ show (posX p) ++ ", " ++ show (posY p) ++ ")"
 
 instance Eq Pos where
@@ -49,18 +51,18 @@ instance Ord Pos where
 
 -- x and y are swapped
 instance Ix Pos where
-   range (p1, p2) = 
+   range (p1, p2) =
       [ Pos x y | y <- [posY p1..posY p2], x <- [posX p1..posX p2] ]
-      
-   index (p1, p2) p = 
+
+   index (p1, p2) p =
       (posY p - posY p1) * (1 + posX p2 - posX p1) + posX p - posX p1
-      
-   inRange (p1, p2) p =  
+
+   inRange (p1, p2) p =
       let between :: Ord a => a -> a -> a -> Bool
-          between x y z = x <= y && y <= z 
-      in between (posX p1) (posX p) (posX p2) && 
+          between x y z = x <= y && y <= z
+      in between (posX p1) (posX p) (posX p2) &&
          between (posY p1) (posY p) (posY p2)
-         
+
    rangeSize (p1, p2) =
       (1 + posX p2 - posX p1) * (1 + posY p2 - posY p1)
 
@@ -70,14 +72,14 @@ adjacentCell :: Pos -> Dir -> Pos
 adjacentCell p = posPlus p . f
  where
    f 0                 = Pos 1 0
-   f 1 | even (posY p) = Pos 0 1 
+   f 1 | even (posY p) = Pos 0 1
        | otherwise     = Pos 1 1
    f 2 | even (posY p) = Pos (-1) 1
        | otherwise     = Pos 0 1
    f 3                 = Pos (-1) 0
    f 4 | even (posY p) = Pos (-1) (-1)
        | otherwise     = Pos 0 (-1)
-   f 5 | even (posY p) = Pos 0 (-1) 
+   f 5 | even (posY p) = Pos 0 (-1)
        | otherwise     = Pos 1 (-1)
    f d = error ("adjacentCell: " ++ show d)
 
@@ -111,18 +113,18 @@ otherColor :: AntColor -> AntColor
 otherColor Red   = Black
 otherColor Black = Red
 
-data Ant = Ant 
+data Ant = Ant
    { antId        :: Int
    , antColor     :: AntColor
    , antState     :: Int
    , antResting   :: Int
    , antDirection :: Dir
-   , antHasFood   :: Bool 
+   , antHasFood   :: Bool
    }
 
 instance Show Ant where
-   show a = concat $ intersperse ", " 
-      [ show (antColor a) ++ " ant of id " ++ show (antId a) 
+   show a = concat $ intersperse ", "
+      [ show (antColor a) ++ " ant of id " ++ show (antId a)
       , "dir " ++ show (antDirection a)
       , "food " ++ if antHasFood a then "1" else "0"
       , "state " ++ show (antState a)
@@ -145,21 +147,21 @@ setHasFood x ant = ant {antHasFood = x}
 -- 2.3 Geography
 
 rocky :: Cell -> Bool
-rocky c = cellType c == Rocky 
+rocky c = cellType c == Rocky
 
 maybeAntAt :: Pos -> Sim (Maybe Ant)
-maybeAntAt p = 
+maybeAntAt p =
    do w <- gets world
       cell <- liftIO $ readArray w p
       return (antInCell cell)
-      
+
 setAntAt :: Ant -> Pos -> Sim ()
-setAntAt a p = 
+setAntAt a p =
    do setAntPosition p a
       changeCellAt (\cell -> cell { antInCell = Just a }) p
-      
+
 clearAntAt :: Ant -> Pos -> Sim ()
-clearAntAt a p = 
+clearAntAt a p =
    do setAntNoPosition a
       changeCellAt (\cell -> cell { antInCell = Nothing }) p
 
@@ -169,7 +171,7 @@ clearAntAt a p =
 
 type World = IOArray Pos Cell
 
-data Cell = Cell 
+data Cell = Cell
    { antInCell    :: Maybe Ant
    , cellType     :: CellType
    , food         :: Int
@@ -192,7 +194,7 @@ showCell (p, cell)
             foodtext   = if food cell > 0 then show (food cell) ++ " food; " else ""
             anttext    = maybe "" show (antInCell cell)
         in begin ++ foodtext ++ hill ++ redmarks ++ blackmarks ++ anttext
-        
+
 ------------------------------------------------------------------
 -- 2.5 Chemistry
 
@@ -206,25 +208,25 @@ anyMarker :: Markers -> Bool
 anyMarker = (/= 0)
 
 showMarkers :: Markers -> String
-showMarkers m = 
+showMarkers m =
    concat [ show i | i <- [0..5], testBit m i]
 
 setMarkerAt :: AntColor -> MarkerNumber -> Cell -> Cell
 setMarkerAt c m cell =
-   case c of 
+   case c of
       Red   -> cell {markersRed   = setBit (markersRed cell)   m}
       Black -> cell {markersBlack = setBit (markersBlack cell) m}
 
-clearMarkerAt :: AntColor -> MarkerNumber -> Cell -> Cell      
-clearMarkerAt c m cell = 
-   case c of 
+clearMarkerAt :: AntColor -> MarkerNumber -> Cell -> Cell
+clearMarkerAt c m cell =
+   case c of
       Red   -> cell {markersRed   = clearBit (markersRed cell)   m}
       Black -> cell {markersBlack = clearBit (markersBlack cell) m}
 
 ------------------------------------------------------------------
 -- 2.6 Phenomenology
 
-data Condition = Friend | Foe | FriendWithFood | FoeWithFood | Food | Rock | Marker MarkerNumber | FoeMarker | Home | FoeHome 
+data Condition = Friend | Foe | FriendWithFood | FoeWithFood | Food | Rock | Marker MarkerNumber | FoeMarker | Home | FoeHome
    deriving Show
 
 cellMatches :: Cell -> Condition -> AntColor -> Bool
@@ -247,7 +249,7 @@ cellMatches cell cond c =
 
 type AntState = Int
 
-data Instruction 
+data Instruction
    = Sense SenseDir AntState AntState Condition
    | Mark MarkerNumber AntState
    | Unmark MarkerNumber AntState
@@ -257,9 +259,9 @@ data Instruction
    | Move AntState AntState
    | Flip Int AntState AntState
  deriving Show
-   
+
 getInstruction :: AntColor -> AntState -> Sim Instruction
-getInstruction c st = 
+getInstruction c st =
    do instrs <- case c of Red -> gets redInstructions ; Black -> gets blackInstructions
       liftIO $ readArray instrs st
 
@@ -268,7 +270,7 @@ getInstruction c st =
 --    (see ReadInstructions.hs)
 
 type AntInstructions = IOArray Int Instruction
- 
+
 ------------------------------------------------------------------
 -- 2.9 Martial Arts
 
@@ -278,14 +280,14 @@ adjacentAnts p c =
       return (free <= 1)
  where
    op :: Int -> Dir -> Sim Int
-   op free d 
+   op free d
       | free >= 2 = return free
-      | otherwise = 
+      | otherwise =
            do mAnt <- maybeAntAt (adjacentCell p d)
               return (free + maybe 1 (\ant -> if antColor ant == c then 0 else 1) mAnt)
 
 checkForSurroundedAntAt :: Pos -> Sim ()
-checkForSurroundedAntAt p = 
+checkForSurroundedAntAt p =
    do mAnt <- maybeAntAt p
       case mAnt of
          Nothing  -> return ()
@@ -307,7 +309,7 @@ checkForSurroundedAnts p =
 -- 2.10 Number Theory
 
 randomStream :: Int -> [Int]
-randomStream = 
+randomStream =
    let f :: Int -> Int
        f x = x * 22695477 + 1
        g :: Int -> Int
@@ -315,7 +317,7 @@ randomStream =
    in map g . drop 4 . iterate f
 
 randomInt :: Int -> Sim Int
-randomInt n = 
+randomInt n =
    do i:is <- gets randoms
       modify (\s -> s { randoms = is })
       return (i `mod` n)
@@ -325,12 +327,12 @@ randomInt n =
 
 step :: (Int, Maybe Pos) -> Sim ()
 step (_, Nothing)  = return ()
-step (i, Just pos) = 
+step (i, Just pos) =
    do cell <- cellAt pos
       case (antInCell cell) of
          Nothing -> return ()
          Just ant
-            | antResting ant > 0 || antId ant /= i -> 
+            | antResting ant > 0 || antId ant /= i ->
                 changeCellAt (changeAnt $ changeResting (\x -> x-1)) pos
             | otherwise ->
                  do instruction <- getInstruction (antColor ant) (antState ant)
@@ -339,80 +341,80 @@ step (i, Just pos) =
 
 doInstruction :: Pos -> Cell -> Ant -> Instruction -> Sim (Cell -> Cell)
 doInstruction pos cell ant instruction =
-   case instruction of 
+   case instruction of
 
-      Sense sensedir st1 st2 cond -> 
+      Sense sensedir st1 st2 cond ->
          do let newpos = sensedCell pos (antDirection ant) sensedir
             newCell <- cellAt newpos
             let b = cellMatches newCell cond (antColor ant)
-            return $ 
+            return $
                changeAnt (setState (if b then st1 else st2))
-                           
-      Mark i st -> 
-         return $ 
+
+      Mark i st ->
+         return $
             setMarkerAt (antColor ant) i .
             changeAnt (setState st)
 
-      Unmark i st -> 
-         return $ 
+      Unmark i st ->
+         return $
             clearMarkerAt (antColor ant) i .
             changeAnt (setState st)
-                        
+
       PickUp st1 st2
-         | antHasFood ant || food cell == 0 -> 
-              return $ 
+         | antHasFood ant || food cell == 0 ->
+              return $
                  changeAnt (setState st2)
          | otherwise ->
               do scorePickup ant cell
                  setFoodAtPos (food cell - 1) pos
-                 return $ 
+                 return $
                     addFood (-1) .
                     changeAnt (setState st1 . setHasFood True)
-                                    
+
       Drop st
-         | antHasFood ant -> 
+         | antHasFood ant ->
               do scoreDrop ant cell
                  setFoodAtPos (food cell) pos
                  return $
                     addFood 1 .
                     changeAnt (setState st . setHasFood False)
-         | otherwise -> 
+         | otherwise ->
               return $
                  changeAnt (setState st)
-                        
-      Turn lr st -> 
-         return $ 
+
+      Turn lr st ->
+         return $
             changeAnt (setState st . setDirection (turn lr (antDirection ant)))
-                                
+
       Move st1 st2 ->
          do let newpos = adjacentCell pos (antDirection ant)
             newCell <- cellAt newpos
             if rocky newCell || isJust (antInCell newCell)
-               then 
-                  return (changeAnt (setState st2)) 
+               then
+                  return (changeAnt (setState st2))
                else
                   do clearAntAt ant pos
                      setAntAt (setResting 14 . setState st1 $ ant) newpos
                      checkForSurroundedAnts newpos
                      return id
-                        
+
       Flip n st1 st2 ->
          do i <- randomInt n
-            return $ 
+            return $
                changeAnt (setState $ if i == 0 then st1 else st2)
 
 changeAnt :: (Ant -> Ant) -> Cell -> Cell
-changeAnt f c = 
+changeAnt f c =
    c { antInCell = fmap f (antInCell c) }
 
 addFood :: Int -> Cell -> Cell
-addFood extra c = 
+addFood extra c =
    c { food = extra + food c }
 
 changeResting :: (Int -> Int) -> Ant -> Ant
-changeResting f a = 
+changeResting f a =
    a { antResting = f (antResting a) }
-   
+
 ------------------------------------------------------------------
 -- 2.12 Game Play and Scoring
 --    (see GamePlay.hs)
@@ -420,7 +422,7 @@ changeResting f a =
 ------------------------------------------------------------------
 -- Food Administration
 
-data FoodAdmin = FoodAdmin 
+data FoodAdmin = FoodAdmin
    { blackScore   :: Int
    , redScore     :: Int
    , blackCarried :: Int
@@ -430,10 +432,10 @@ data FoodAdmin = FoodAdmin
    }
 
 changeFoodAdmin :: (FoodAdmin -> FoodAdmin) -> Sim ()
-changeFoodAdmin f = 
+changeFoodAdmin f =
    modify (\s -> s { foodAdmin = f (foodAdmin s) })
 
-noFood :: FoodAdmin 
+noFood :: FoodAdmin
 noFood = FoodAdmin 0 0 0 0 0 S.empty
 
 changeScore :: Maybe AntColor -> (Int -> Int) -> FoodAdmin -> FoodAdmin
@@ -448,7 +450,7 @@ changeCarried Black f score = score { blackCarried = f (blackCarried score) }
 scoreDrop :: Ant -> Cell -> Sim ()
 scoreDrop ant cell =
    changeFoodAdmin ( changeCarried (antColor ant) (\x -> x-1)
-                   . changeScore (anthill cell) (+1)      
+                   . changeScore (anthill cell) (+1)
                    )
 
 scorePickup :: Ant -> Cell -> Sim ()
@@ -464,20 +466,20 @@ scoreKill ant cell =
                    )
 
 setFoodAtPos :: Int -> Pos -> Sim ()
-setFoodAtPos i pos = 
-   changeFoodAdmin (\s -> s { locations = if i==0 then S.delete pos (locations s)  
+setFoodAtPos i pos =
+   changeFoodAdmin (\s -> s { locations = if i==0 then S.delete pos (locations s)
                                                   else S.insert pos (locations s)})
-                                                  
+
 ------------------------------------------------------------------
--- Ant Positions        
-                                               
+-- Ant Positions
+
 type AntPositions = IOArray Int (Maybe Pos)
 
 setAntMaybePosition :: Maybe Pos -> Ant -> Sim ()
-setAntMaybePosition mpos ant = 
+setAntMaybePosition mpos ant =
    do pm <- gets antPositions
       liftIO $ writeArray pm (antId ant) mpos
-   
+
 setAntPosition :: Pos -> Ant -> Sim ()
 setAntPosition = setAntMaybePosition . Just
 
@@ -490,7 +492,7 @@ cellAt pos =
       liftIO $ readArray arr pos
 
 changeCellAt :: (Cell -> Cell) -> Pos -> Sim ()
-changeCellAt f p = 
+changeCellAt f p =
    do arr  <- gets world
       cell <- liftIO $ readArray arr p
       liftIO (writeArray arr p (f cell))
