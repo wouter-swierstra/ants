@@ -8,12 +8,19 @@ module Caching
    , cellCentre, antPolygon, drawPolygons
    ) where
 
-import Graphics.UI.WX
 import Simulator
 import Data.Array.IO
 import Data.List
 import Control.Monad
 import qualified Data.Array as A
+import Graphics.Gloss.Data.Color (Color, makeColorI, bright, red, green, blue, black)
+import Graphics.Gloss.Data.Point (Point)
+import Graphics.Gloss.Data.Picture (Picture(Pictures), color, polygon)
+
+-- Interop with wx
+pointX, pointY :: Point -> Float
+pointX = fst
+pointY = snd
 
 data Cache = C
    { points   :: IOArray Pos CachedPoints
@@ -42,10 +49,10 @@ antPolygon pos dir cache =
    do (_, arr) <- readArray (points cache) pos
       return (arr A.! dir)
 
-drawPolygons :: DC a -> Cache -> IO ()
-drawPolygons dc cache =
-   let f (Polygon (ps, c)) = polygon dc ps [color := c, brushColor := c, brushKind := BrushSolid]
-   in mapM_ f (polygons cache)
+drawPolygons :: Cache -> Picture
+drawPolygons cache =
+   let f (Polygon (points, c)) = color c $ polygon points
+   in Pictures $ map f (polygons cache)
 
 ------------------------------------------------------------------------
 -- Local definitions (not exported)
@@ -197,7 +204,7 @@ scaleFPos :: Float -> FPos -> FPos
 scaleFPos f (FPos (x, y)) = FPos (f*x, f*y)
 
 fposToPoint :: FPos -> Point
-fposToPoint (FPos (x, y)) = Point (round x) (round y)
+fposToPoint (FPos (x, y)) = (x, y)
 
 toFPos :: Float -> Pos -> FPos
 toFPos scale pos =
@@ -207,11 +214,7 @@ toFPos scale pos =
 ------------------------------------------------------------------------
 -- Colors
 
-brighter :: Color -> Color
-brighter c = rgb (f $ colorRed c) (f $ colorGreen c) (f $ colorBlue c)
-   where f i = i + (255 - i) `div` 2
-
 rockBrown, hillRed, hillBlack :: Color
-rockBrown = rgb 166 105 41
-hillRed   = brighter (brighter red)
-hillBlack = brighter (brighter black)
+rockBrown = makeColorI 166 105 41 255
+hillRed   = bright (bright red)
+hillBlack = bright (bright black)
