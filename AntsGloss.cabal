@@ -1,0 +1,28 @@
+name:                AntsGloss
+version:             0.0.0.1
+author:              Martijn Fleuren
+maintainer:          martijn@mafl.me
+category:            Game
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+license:             GPL
+license-file:        LICENSE
+description:         Gloss implementation of the ISFP programming contest ANTS.
+                     The game is used for a course in advanced functional
+                     programming at Utrecht University and due to the poor
+                     support of wxHaskell it had to be ported.
+synopsis:            -
+executable Ants
+  main-is:             Main.hs
+  default-extensions:  DisambiguateRecordFields, NamedFieldPuns
+  build-depends:       base >=4.0 && <5.0,
+                       containers,
+                       array,
+                       parsec,
+                       gloss >=1.9,
+                       random >=1.0 && <= 1.1,
+                       time >=1.5
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+  ghc-options: -O2 -threaded
