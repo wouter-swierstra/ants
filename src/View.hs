@@ -6,7 +6,6 @@ module View
 
 import Graphics.Gloss
 
-import Config
 import Model
 import Ant
 import Grid

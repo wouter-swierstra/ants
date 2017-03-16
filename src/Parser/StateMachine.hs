@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Parser.StateMachineParser
+module Parser.StateMachine
   ( ANTLang      (..)
   , Pointer      (..)
   , StateMachine (..)

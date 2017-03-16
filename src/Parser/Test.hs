@@ -5,7 +5,7 @@ module Test
   , allInstructionsValid
   ) where
 
-import Parser.StateMachineParser
+import Parser.StateMachine
 import Map
 import Data.Either
 import Control.Monad.State

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Parser.WorldParser
+module Parser.World
   ( listToWorldMap
   , parseMapToWorldMap
   , parseMap

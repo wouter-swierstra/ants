@@ -8,44 +8,45 @@ import Control.Applicative
 
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import System.Environment    (getArgs)
+import System.Console.ParseArgs
+import Data.Maybe
 
 import Graphics.Gloss
-import Config
 import Model
 import View
 import Controller
-import Parser.WorldParser
-import Parser.StateMachineParser
+import Parser.World
+import Parser.StateMachine
+import Arguments
+
 
 main :: IO ()
 main = do
-    args     <- getArgs
-    time     <- round <$> getPOSIXTime
+    args     <- parseAntArguments <$> getArgs
 
-    -- undefined in initial needs to be replaced with an ant program, a world
+    -- To be used as a seed for the random generator
+    time <- round <$> getPOSIXTime
 
-    let redprogram      = undefined
-        blackprogram    = undefined
-        worldmap        = undefined
-        initial'        = initial time undefined undefined undefined
-        (w, h, display) = chooseDisplay args
+    -- Read the source files, the command line options are required so you can
+    -- be assured that they are there and that fromJust is safe.
+    redAntSource   <- readFile . fromJust $ getArgString args "red"
+    blackAntSource <- readFile . fromJust $ getArgString args "black"
+    worldmapSource <- readFile . fromJust $ getArgString args "world"
+
+    let -- Parse the programs and the worldmap
+        redprogram   = parseAntStateMachine redAntSource
+        blackprogram = parseAntStateMachine blackAntSource
+        worldmap     = parseMapToWorldMap worldmapSource
+
+        initial'     = initial time redprogram blackprogram worldmap
+
+        -- hres and vres are defaulted parameters so they are _always_ available
+        -- in the argument vector.
+        w               = fromJust $ getArgFloat args "hres"
+        h               = fromJust $ getArgFloat args "vres"
+
+        display         = InWindow "Ants Gloss" (round w, round h) (100, 100)
         background      = makeColorI 0 144 33 0
         fps             = 30
     play display background fps initial' (draw w h) eventHandler timeHandler
 
--- | chooseDisplay
--- Choose a display mode. Note that the resolution of a full screen mode
--- should likely match the resolution of your monitor exactly.
-chooseDisplay :: [String] -> (Float, Float, Display)
-chooseDisplay []
-    = ( defaultHorizontalResolution, defaultVerticalResolution
-      , InWindow "Ants Gloss"
-                 (round defaultHorizontalResolution
-                 ,round defaultVerticalResolution  )
-                 (100,100)
-      )
-
-chooseDisplay [read -> horizontal, read -> vertical]
-    = ( fromIntegral horizontal, fromIntegral vertical
-      , FullScreen (horizontal, vertical)
-      )

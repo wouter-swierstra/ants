@@ -6,6 +6,7 @@ module Ant
   , AntId    (..)
   , isBlack
   , isRed
+  , dead
   ) where
 
 import Grid
@@ -17,8 +18,8 @@ data Colour = Red | Black
   deriving (Eq, Show)
 
 isBlack, isRed :: AntState -> Bool
-isBlack antS= colour antS == Black
-isRed = not . isBlack
+isBlack antS = colour antS == Black
+isRed        = not . isBlack
 
 type AntId = Int
 
@@ -30,14 +31,19 @@ data AntState = AntState
   , direction :: Direction -- Current direction that the ant is traveling
   , hasFood   :: Bool      -- Does the ant carry food or not?
   , position  :: Position
+  , alive     :: Bool      -- is the ant alive?
   } deriving Eq
+
+dead :: AntState -> Bool
+dead = not . alive
 
 instance Show AntState where
   show AntState{..} =
-    "Ant # 00000\n  "    ++ show colour
-    ++ "\n  Brainstate " ++ show ptr
-    ++ "\n  Resting:   " ++ show resting
-    ++ "\n  Heads "      ++ map toLower (show direction)
-    ++ "\n  Carries "    ++ (if hasFood then "" else "no ") ++ "food"
+    let antId' = until (\x -> length x == 5) ('0':) (show antId)
+    in "Ant # " ++ antId' ++ "\n  "    ++ show colour
+      ++ "\n  Brainstate " ++ show ptr
+      ++ "\n  Resting:   " ++ show resting
+      ++ "\n  Heads "      ++ map toLower (show direction)
+      ++ "\n  Carries "    ++ (if hasFood then "" else "no ") ++ "food"
 
 testAnt = AntState { antId = 0 , colour = Black , ptr = 0 , resting = 10 , direction = East , hasFood  = False, position = (0, 0)}

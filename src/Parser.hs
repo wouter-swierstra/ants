@@ -1,4 +1,4 @@
 module Parser
 
-import Parser.StateMachineParser
-import Parser.WorldParser
+import Parser.StateMachine
+import Parser.World
